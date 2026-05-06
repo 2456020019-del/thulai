@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Birthday Celebration Portal - Balanced Version</title>
+<style>
+/* ==========================
+   CSS TỔNG HỢP & RESET
+========================== */
+body, html {
+    margin:0; padding:0;
+    width:100%; height:100%;
+    background:black;
+    overflow:hidden;
+    user-select: none;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+canvas { position:absolute; top:0; left:0; }
+
+/* CSS MÀN HÌNH KHÓA */
+#lockScreen {
+    position:fixed;
+    inset:0;
+    background:
+        radial-gradient(circle at 10% 10%, rgba(255,182,193,0.2), transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(173,216,230,0.2), transparent 40%),
+        #0f000a;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    z-index:9999; 
+    transition: opacity 1.5s ease-in-out;
+}
+.header-msg {
+    font-size: 20px; margin-bottom: 25px; color: #ffc0cb;
+    text-shadow: 0 0 10px rgba(255,192,203,0.8);
+}
+#display {
+    font-size:40px; height: 60px; display: flex; align-items: center;
+    justify-content: center; letter-spacing:12px; margin-bottom: 30px;
+    filter: drop-shadow(0 0 10px #ff69b4);
+}
+.grid { display:grid; grid-template-columns: repeat(3, 85px); gap: 18px; }
+.btn {
+    position:relative; width:85px; height:85px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px; color:rgba(255,255,255,0.9);
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 182, 193, 0.3);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4); backdrop-filter: blur(12px);
+    cursor:pointer; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: float 4s ease-in-out infinite;
+}
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.btn:hover { transform: scale(1.1) translateY(-10px); background: rgba(255, 105, 180, 0.2); border-color: #ff69b4; }
+
+.spark { position: absolute; width: 4px; height: 4px; background: white; border-radius: 50%; animation: fly 0.6s ease-out forwards; }
+@keyframes fly { to { transform: translate(var(--x), var(--y)); opacity: 0; } }
+.shake { animation: shake 0.4s; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-12px); } 75% { transform: translateX(12px); } }
+
+/* Chuyển cảnh hố đen - Tốc độ vừa phải */
+#canvas { 
+    z-index: 999; 
+    pointer-events: none; 
+    transition: transform 1.5s cubic-bezier(0.6, -0.28, 0.735, 0.045), opacity 1.2s; 
+}
+.implode-particles { transform: scale(0); opacity: 0; }
+.fade-out-lock { opacity: 0; pointer-events: none; }
+
+#impact-flash {
+    position: fixed; inset: 0; background: white; opacity: 0; z-index: 10000; pointer-events: none;
+}
+.flash-active { animation: flashEffect 1.2s ease-out; }
+@keyframes flashEffect { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+/* CSS SINH NHẬT */
+#birthdayLayer { position: fixed; inset: 0; z-index: 10; display: none; }
+
+.curtain-container { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; z-index:50; pointer-events:none; }
+.curtain { width:50%; height:100%; background:#b71c1c; transition:2.5s cubic-bezier(0.645, 0.045, 0.355, 1); background-image:repeating-linear-gradient(90deg,transparent,transparent 35px,rgba(0,0,0,0.2) 45px); }
+.open .left { transform:translateX(-100%); }
+.open .right { transform:translateX(100%); }
+
+#black-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:black; opacity:0; transition:1.6s; z-index:120; pointer-events:none; }
+.darken #black-overlay { opacity:1; }
+
+.main-background { width:100%; height:100vh; background-size:cover; background-position:center; display:flex; justify-content:center; }
+.banners-wrapper { position:absolute; top:-200px; width:100%; height:120px; background:url("day.png") repeat-x center/contain; animation:bannerDrop 1.5s forwards 1.5s; }
+@keyframes bannerDrop { to { top:0; } }
+
+.birthday-combo { position:absolute; left:-1500px; top:10%; width:500px; animation:slideCombo 2.5s forwards 2.5s; }
+.combo-image { width:80%; }
+@keyframes slideCombo { to { left:53%; transform:translateX(-50%); } }
+
+.cake-container { position:absolute; bottom:-600px; animation:riseUp 1.5s forwards 4.5s; z-index:200; display:flex; flex-direction:column; align-items:center; }
+@keyframes riseUp { to { bottom:3%; } }
+.img-cake { width:650px; }
+
+.candle { position:absolute; top:150px; width:16px; height:100px; background:linear-gradient(#ff6b6b,#ff9f43); border-radius:4px; display:none; }
+.flame { width:20px; height:35px; position:absolute; top:-32px; left:50%; transform:translateX(-50%); border-radius:50%; background:radial-gradient(circle at 50% 100%,#fff,#ff0,#f90,transparent); animation:flicker .12s infinite alternate; }
+@keyframes flicker { 0% { transform:translateX(-50%) scale(1);} 100% { transform:translateX(-50%) scale(1.15);} }
+
+/* Chữ "Thổi mạnh" bay vào êm ái hơn */
+#special-content { position:fixed; top:-6%; right:-120%; transition:12s; z-index:300; transform:scale(0.5); display:flex; flex-direction:column; align-items:center; }
+.special-img { width:350px; }
+.special-text { margin-top:12px; font-size:48px; font-weight:bold; color:#ffeb3b; white-space:nowrap; text-shadow:0 0 15px #fff200, 0 0 30px #ffeb3b; }
+.content-fly-in { right:110% !important; }
+
+#fireworks { position:fixed; top:0; left:0; width:100%; height:100%; display:none; pointer-events:none; z-index:500; }
+
+/* THƯ */
+#letterWrapper { position:fixed; top:0; left:0; width:100%; height:100%; display:none; justify-content:center; align-items:center; background:rgba(0,0,0,0.45); z-index:99999; }
+#letterClosed { cursor:pointer; animation:bounce 1.4s infinite; }
+#letterClosed img { width:160px; }
+@keyframes bounce { 0%,100% {transform:translateY(0);} 50% {transform:translateY(-18px);} }
+.book { width:430px; height:300px; position:relative; display:none; }
+.page { width:100%; height:100%; position:absolute; background:#fff8e7; border-radius:15px; box-shadow:0 0 25px rgba(255,255,255,.5); }
+.page-front { display:flex; justify-content:center; align-items:center; transform-origin:left; transition:0.9s ease-in-out; }
+.letter-icon { width:140px; }
+.page-back { z-index:1; padding:25px; }
+.letter-content { font-size:22px; line-height:1.6; text-align:center; }
+.book.flip .page-front { transform:translateX(-95%) rotateZ(-8deg) skewY(3deg); opacity:0.4; }
+</style>
+</head>
+<body>
+
+<div id="impact-flash"></div>
+
+<div id="lockScreen">
+    <div class="header-msg">✨ Giai điệu bí mật ✨</div>
+    <div id="display"></div>
+    <div class="grid">
+        <div class="btn" onclick="handleInput('1', 261.63)">1</div>
+        <div class="btn" onclick="handleInput('2', 293.66)">2</div>
+        <div class="btn" onclick="handleInput('3', 329.63)">3</div>
+        <div class="btn" onclick="handleInput('4', 349.23)">4</div>
+        <div class="btn" onclick="handleInput('5', 392.00)">5</div>
+        <div class="btn" onclick="handleInput('6', 440.00)">6</div>
+        <div class="btn" onclick="handleInput('7', 493.88)">7</div>
+        <div class="btn" onclick="handleInput('8', 523.25)">8</div>
+        <div class="btn" onclick="handleInput('9', 587.33)">9</div>
+        <div class="btn special" onclick="handleInput('✨', 650)">✨</div>
+        <div class="btn" onclick="handleInput('0', 466.16)">0</div>
+        <div class="btn special" onclick="handleInput('⌫', 220)">⌫</div>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="birthdayLayer">
+    <div id="black-overlay"></div>
+    <canvas id="fireworks"></canvas>
+    
+    <div id="special-content">
+        <img src="tho.png" class="special-img">
+        <div class="special-text">Thổi mạnh lên nè!</div>
+    </div>
+
+    <div class="curtain-container" id="curtainWrapper">
+        <div class="curtain left"></div>
+        <div class="curtain right"></div>
+    </div>
+
+    <div class="main-background" style="background-image:url('nen.png');">
+        <div class="banners-wrapper"></div>
+        <div class="birthday-combo">
+            <img src="tonghop.png" class="combo-image">
+        </div>
+        <div class="cake-container">
+            <div class="candle" id="candle">
+                <div class="flame" id="flame"></div>
+            </div>
+            <img src="banh.png" class="img-cake">
+        </div>
+    </div>
+</div>
+
+<div id="letterWrapper">
+    <div id="letterClosed"><img src="icon.png"></div>
+    <div id="letterBook" class="book">
+        <div class="page page-front"><img src="icon.png" class="letter-icon"></div>
+        <div class="page page-back">
+            <div class="letter-content">
+                <h2>Chúc mừng sinh nhật! ❤️</h2>
+                <p>Tuổi mới rạng rỡ, hạnh phúc và luôn thành công trên con đường mình đã chọn nhé!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ==========================
+   LOGIC MẬT MÃ & ÂM THANH
+========================== */
+let unlocked = false;
+const correctPin = "080506";
+let currentInput = "";
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function beep(freq) {
+    initAudio();
+    let o = audioCtx.createOscillator();
+    let g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start();
+    g.gain.setValueAtTime(0.6, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.5);
+    setTimeout(() => o.stop(), 500);
+}
+
+function handleInput(val, freq) {
+    if (unlocked) return;
+    const e = window.event;
+    createSparkle(e);
+    beep(freq);
+    const display = document.getElementById('display');
+    const lock = document.getElementById('lockScreen');
+
+    if (val === '⌫') currentInput = currentInput.slice(0, -1);
+    else if (val === '✨') currentInput = "";
+    else if (currentInput.length < 6) currentInput += val;
+    display.innerText = "🌸".repeat(currentInput.length);
+    
+    if (currentInput.length === 6) {
+        if (currentInput === correctPin) {
+            unlocked = true;
+            lock.classList.add('fade-out-lock');
+            [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => setTimeout(() => beep(f), i * 100));
+            
+            setTimeout(() => {
+                const canvas = document.getElementById('canvas');
+                canvas.classList.add('implode-particles');
+                
+                setTimeout(() => {
+                    canvas.style.display = 'none';
+                    document.getElementById('lockScreen').style.display = 'none';
+                    document.getElementById('birthdayLayer').style.display = 'block';
+                    startShow();
+                }, 1400); 
+            }, 8000); // Đợi hạt xoay lung linh 8 giây rồi mới thu lại
+        } else {
+            beep(100); lock.classList.add('shake');
+            setTimeout(() => { lock.classList.remove('shake'); currentInput = ""; display.innerText = ""; }, 400);
+        }
+    }
+}
+
+function createSparkle(e) {
+    const btn = e.currentTarget;
+    for(let i=0; i<8; i++) {
+        const s = document.createElement('div');
+        s.className = 'spark';
+        const angle = (i / 8) * Math.PI * 2;
+        const dist = 40 + Math.random() * 20;
+        s.style.setProperty('--x', Math.cos(angle) * dist + 'px');
+        s.style.setProperty('--y', Math.sin(angle) * dist + 'px');
+        btn.appendChild(s);
+        setTimeout(() => s.remove(), 600);
+    }
+}
+
+/* ==========================
+   LOGIC MỞ RÈM & NHỊP ĐIỆU CÂN BẰNG
+========================== */
+function startShow(){
+    setTimeout(()=>{ 
+        document.getElementById("curtainWrapper").classList.add("open"); 
+    }, 500);
+
+    // Thời gian chuẩn để rèm mở hết rồi mới làm tối màn hình
+    setTimeout(()=>{ document.body.classList.add("darken"); }, 6500);
+    setTimeout(()=>{
+        document.getElementById("candle").style.display="block";
+        document.getElementById("special-content").classList.add("content-fly-in");
+        listenBlow();
+    }, 6500);
+}
+
+function listenBlow(){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+        const ctxBlow=new (window.AudioContext || window.webkitAudioContext)();
+        const analyser=ctxBlow.createAnalyser();
+        const mic=ctxBlow.createMediaStreamSource(stream);
+        const processor=ctxBlow.createScriptProcessor(2048,1,1);
+        analyser.fftSize=1024;
+        mic.connect(analyser); analyser.connect(processor); processor.connect(ctxBlow.destination);
+        processor.onaudioprocess=()=>{
+            const data=new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(data);
+            let avg=data.reduce((a,b)=>a+b)/data.length;
+            if(avg>55) extinguish(stream);
+        };
+    }).catch(err => console.log("Cần quyền micro để thổi nến!"));
+}
+
+function extinguish(stream){
+    document.getElementById("flame").style.display="none";
+    createSmoke();
+    stream.getTracks().forEach(t=>t.stop());
+    startFireworks().then(()=>{
+        document.body.classList.remove("darken");
+        document.getElementById("candle").style.display="none";
+        document.getElementById("special-content").style.display="none";
+        showLetter();
+    });
+}
+
+function createSmoke(){
+    const c=document.getElementById("candle");
+    for(let i=0;i<6;i++){
+        let s=document.createElement("div");
+        s.className="smoke"; s.style.animationDelay=(i*0.15)+"s";
+        c.appendChild(s); setTimeout(()=>s.remove(),3000);
+    }
+}
+
+function startFireworks(){
+    return new Promise(resolve=>{
+        const canvasF=document.getElementById("fireworks");
+        const ctxF=canvasF.getContext("2d");
+        canvasF.width=innerWidth; canvasF.height=innerHeight;
+        canvasF.style.display="block";
+        const fireworks=[], particles=[];
+        class Firework{
+            constructor(){
+                this.x=Math.random()*canvasF.width; this.y=canvasF.height;
+                this.tx=Math.random()*canvasF.width; this.ty=Math.random()*canvasF.height/2;
+                this.speed=5; this.boom=false; this.color=`hsl(${Math.random()*360},100%,60%)`;
+            }
+            update(){
+                const dx=this.tx-this.x, dy=this.ty-this.y; const d=Math.sqrt(dx*dx+dy*dy);
+                if(d>5){ this.x+=dx/d*this.speed; this.y+=dy/d*this.speed; }
+                else { this.boom=true; for(let i=0;i<40;i++) particles.push(new ParticleF(this.x,this.y,this.color)); }
+            }
+            draw(){ ctxF.beginPath(); ctxF.arc(this.x,this.y,3,0,Math.PI*2); ctxF.fillStyle=this.color; ctxF.fill(); }
+        }
+        class ParticleF{
+            constructor(x,y,color){
+                this.x=x;this.y=y; this.angle=Math.random()*Math.PI*2; this.speed=Math.random()*4+1;
+                this.friction=0.95; this.gravity=0.15; this.alpha=1; this.decay=Math.random()*0.02+0.01; this.color=color;
+            }
+            update(){ this.x+=Math.cos(this.angle)*this.speed; this.y+=Math.sin(this.angle)*this.speed + this.gravity; this.speed*=this.friction; this.alpha-=this.decay; }
+            draw(){ ctxF.globalAlpha=this.alpha; ctxF.beginPath(); ctxF.arc(this.x,this.y,3,0,Math.PI*2); ctxF.fillStyle=this.color; ctxF.fill(); ctxF.globalAlpha=1; }
+        }
+        function animF(){
+            ctxF.clearRect(0,0,canvasF.width,canvasF.height);
+            if(Math.random()<0.08) fireworks.push(new Firework());
+            for(let i=fireworks.length-1;i>=0;i--){ fireworks[i].update(); fireworks[i].draw(); if(fireworks[i].boom) fireworks.splice(i,1); }
+            for(let i=particles.length-1;i>=0;i--){ particles[i].update(); particles[i].draw(); if(particles[i].alpha<=0) particles.splice(i,1); }
+            requestAnimationFrame(animF);
+        }
+        animF();
+        setTimeout(()=>{ canvasF.style.display="none"; resolve(); },5500);
+    });
+}
+
+function showLetter(){
+    const wrap=document.getElementById("letterWrapper");
+    const closed=document.getElementById("letterClosed");
+    const book=document.getElementById("letterBook");
+    wrap.style.display="flex";
+    closed.onclick=()=>{
+        closed.style.display="none"; book.style.display="block";
+        setTimeout(()=>{ book.classList.add("flip"); },80);
+    };
+}
+
+/* ==========================
+   HỆ THỐNG HẠT PHÂN TÁN (CANVAS L)
+========================== */
+const canvasL = document.getElementById("canvas");
+const ctxL = canvasL.getContext("2d");
+let w, h;
+function resize() { w = canvasL.width = window.innerWidth; h = canvasL.height = window.innerHeight; }
+window.onresize = resize; resize();
+
+class Star {
+    constructor(side) { this.side = side; this.reset(); }
+    reset() { this.x = this.side === 1 ? -150 : w + 150; this.y = h / 2; this.vx = this.side * 12; this.color = this.side === 1 ? "#ffd700" : "#00f2ff"; }
+    update() {
+        ctxL.beginPath();
+        let grad = ctxL.createLinearGradient(this.x, this.y, this.x - this.vx*20, this.y);
+        grad.addColorStop(0, this.color); grad.addColorStop(1, "transparent");
+        ctxL.strokeStyle = grad; ctxL.lineWidth = 5; ctxL.moveTo(this.x, this.y); ctxL.lineTo(this.x - this.vx*20, this.y); ctxL.stroke();
+        this.x += this.vx;
+    }
+}
+
+class ParticleL {
+    constructor(x, y) {
+        this.x = x; this.y = y; let ang = Math.random() * Math.PI * 2; let speed = 2 + Math.random() * 8; 
+        this.vx = Math.cos(ang) * speed; this.vy = Math.sin(ang) * speed;
+        this.color = `hsl(${Math.random()*360}, 100%, 80%)`; 
+        this.targetAng = Math.random() * Math.PI * 2;
+        this.radius = 180 + Math.random() * 40; 
+        this.state = 'explode';
+        this.ease = 0.02 + Math.random() * 0.03;
+    }
+    update(cx, cy, rotateSpeed, startGather) {
+        if(this.state === 'explode') {
+            this.x += this.vx; this.y += this.vy; this.vx *= 0.985; this.vy *= 0.985; 
+            if(startGather) this.state = 'form';
+        } else {
+            this.targetAng += rotateSpeed;
+            let tx = cx + Math.cos(this.targetAng) * this.radius;
+            let ty = cy + Math.sin(this.targetAng) * this.radius;
+            this.x += (tx - this.x) * this.ease; this.y += (ty - this.y) * this.ease;
+        }
+        ctxL.fillStyle = this.color; ctxL.beginPath(); ctxL.arc(this.x, this.y, 1.5, 0, Math.PI*2); ctxL.fill();
+    }
+}
+
+let starL = new Star(1); let starR = new Star(-1); let particlesL = [];
+let collided = false; let collideTime = 0; let rotSpd = 0;
+
+function animateL() {
+    ctxL.fillStyle = "rgba(0,0,0,0.15)"; ctxL.fillRect(0,0,w,h);
+    
+    if (unlocked) {
+        if(!collided) {
+            starL.update(); starR.update();
+            if(Math.abs(starL.x - starR.x) < 40) { 
+                collided = true; 
+                collideTime = Date.now(); 
+                document.getElementById('impact-flash').classList.add('flash-active');
+                for(let i=0; i<1500; i++) particlesL.push(new ParticleL(w/2, h/2)); 
+            }
+        } else {
+            let elap = Date.now() - collideTime;
+            let startG = elap > 2500;
+            if(elap > 4500) rotSpd += (0.085 - rotSpd) * 0.02;
+            particlesL.forEach(p => p.update(w/2, h/2, rotSpd, startG));
+            
+            if(rotSpd > 0.01) {
+                ctxL.beginPath(); 
+                let g = ctxL.createRadialGradient(w/2, h/2, 0, w/2, h/2, 250);
+                g.addColorStop(0, "rgba(255,182,193,0.25)"); g.addColorStop(1, "transparent");
+                ctxL.fillStyle = g; ctxL.arc(w/2, h/2, 280, 0, Math.PI*2); ctxL.fill();
+            }
+        }
+    }
+    requestAnimationFrame(animateL);
+}
+animateL();
+</script>
+</body>
+</html>
+```[cite: 1]
